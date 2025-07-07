@@ -9,7 +9,7 @@ import ProductCategory from "@/components/product-category";
 import ProductModal from "@/components/product-modal";
 import PriceAnalysis from "@/components/price-analysis";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { localStorageService } from "@/lib/localStorage";
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,16 +19,16 @@ export default function Home() {
   const queryClient = useQueryClient();
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
-    queryKey: ['/api/products'],
+    queryKey: ['products'],
+    queryFn: () => Promise.resolve(localStorageService.getAllProducts()),
   });
 
   const createProductMutation = useMutation({
     mutationFn: async (product: Omit<Product, 'id'>) => {
-      const response = await apiRequest('POST', '/api/products', product);
-      return response.json();
+      return localStorageService.createProduct(product);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       setHasEdited(true);
       toast({
         title: "Товар добавлен",
@@ -46,11 +46,12 @@ export default function Home() {
 
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, ...product }: Partial<Product> & { id: number }) => {
-      const response = await apiRequest('PUT', `/api/products/${id}`, product);
-      return response.json();
+      const result = localStorageService.updateProduct(id, product);
+      if (!result) throw new Error('Product not found');
+      return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       setHasEdited(true);
       toast({
         title: "Товар обновлен",
@@ -68,11 +69,12 @@ export default function Home() {
 
   const deleteProductMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest('DELETE', `/api/products/${id}`);
+      const success = localStorageService.deleteProduct(id);
+      if (!success) throw new Error('Product not found');
       return id;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       setHasEdited(true);
       toast({
         title: "Товар удален",
